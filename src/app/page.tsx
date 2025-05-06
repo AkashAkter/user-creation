@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, LogOut, Loader2, X } from "lucide-react";
+import { Sparkles, LogOut, Loader2, X, Linkedin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface BalloonProps {
@@ -66,6 +66,8 @@ export default function BalloonPopGame() {
   const [balloons, setBalloons] = useState<BalloonData[]>([]);
   const [gameTime, setGameTime] = useState(10);
   const [showResult, setShowResult] = useState(false);
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [showWithdrawMessage, setShowWithdrawMessage] = useState(false);
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const maxBalloons = useRef(50);
@@ -105,6 +107,7 @@ export default function BalloonPopGame() {
     setGameTime(10);
     setBalloons([]);
     setShowResult(false);
+    setShowWithdrawMessage(false);
 
     gameIntervalRef.current = setInterval(() => {
       if (balloons.length < maxBalloons.current) {
@@ -138,6 +141,10 @@ export default function BalloonPopGame() {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     setGameStarted(false);
     setShowResult(true);
+
+    // Calculate earnings (100 USD per point)
+    const newEarnings = score * 100;
+    setTotalEarnings((prev) => prev + newEarnings);
   };
 
   const popBalloon = (id: number) => {
@@ -149,6 +156,17 @@ export default function BalloonPopGame() {
     localStorage.removeItem("token");
     localStorage.removeItem("userName");
     router.push("/login");
+  };
+
+  const handleWithdrawClick = () => {
+    setShowWithdrawMessage(true);
+  };
+
+  const formatUSD = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
   };
 
   if (loading) {
@@ -205,6 +223,28 @@ export default function BalloonPopGame() {
           </p>
         </motion.section>
 
+        {/* Earnings Display */}
+        {totalEarnings > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-amber-100 to-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-center shadow-sm"
+          >
+            <p className="text-sm text-amber-600 mb-1">Your Total Earnings</p>
+            <div className="flex items-center justify-center gap-3">
+              <p className="text-3xl font-bold text-amber-700">
+                {formatUSD(totalEarnings)}
+              </p>
+              <button
+                onClick={handleWithdrawClick}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1 rounded-full text-sm font-medium transition"
+              >
+                Withdraw
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* Game Controls */}
         <section className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-indigo-100">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-6">
@@ -254,7 +294,7 @@ export default function BalloonPopGame() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-purple-500">•</span>
-                <span>Each balloon gives you 1 point</span>
+                <span>Each balloon gives you 1 point (worth $100!)</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-purple-500">•</span>
@@ -319,6 +359,16 @@ export default function BalloonPopGame() {
                   </span>
                 </div>
 
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-amber-600 mb-1">You earned:</p>
+                  <p className="text-2xl font-bold text-amber-700">
+                    {formatUSD(score * 100)}
+                  </p>
+                  <p className="text-xs text-amber-500 mt-1">
+                    (Total: {formatUSD(totalEarnings + score * 100)})
+                  </p>
+                </div>
+
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -327,6 +377,68 @@ export default function BalloonPopGame() {
                 >
                   Play Again
                 </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Withdraw Message Modal */}
+      <AnimatePresence>
+        {showWithdrawMessage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full relative"
+            >
+              <button
+                onClick={() => setShowWithdrawMessage(false)}
+                className="absolute top-4 right-4 text-indigo-400 hover:text-indigo-600"
+              >
+                <X size={24} />
+              </button>
+
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-indigo-800 mb-4">
+                  Surprise! 🎉
+                </h3>
+
+                <div className="space-y-4 mb-6">
+                  <p className="text-indigo-600">
+                    Just kidding! You won&#39;t get a single penny of that{" "}
+                    {formatUSD(totalEarnings)}. 😅
+                  </p>
+                  <p className="text-indigo-600">
+                    But hey, how about a virtual coffee instead?
+                  </p>
+                </div>
+
+                <div className="bg-indigo-50 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-indigo-500 mb-2">
+                    Let&#39;s connect and chat about:
+                  </p>
+                  <ul className="text-xs text-indigo-600 space-y-1">
+                    <li>• This fun game you just played</li>
+                    <li>• Web development ideas</li>
+                    <li>• Or just life in general</li>
+                  </ul>
+                </div>
+
+                <a
+                  href="https://www.linkedin.com/in/akash08akter"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 bg-[#0A66C2] hover:bg-[#0A66C2]/90 text-white py-3 px-6 rounded-full font-medium transition"
+                >
+                  <Linkedin size={20} />
+                  Let&#39;s Connect on LinkedIn
+                </a>
               </div>
             </motion.div>
           </motion.div>
