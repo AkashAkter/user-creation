@@ -93,18 +93,6 @@ const TEST_QUESTIONS = [
     hint: "Bathroom item",
   },
 
-  // Easy tech questions
-  {
-    question: "What does 'www' stand for?",
-    answers: ["world wide web"],
-    hint: "Web prefix",
-  },
-  {
-    question: "Which key deletes text? (Backspace/Delete)",
-    answers: ["backspace", "delete"],
-    hint: "Keyboard keys",
-  },
-
   // Fun personal questions
   {
     question: "What's the best day of the week?",
