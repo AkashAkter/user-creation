@@ -1,449 +1,298 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useEffect, useState, useRef } from "react";
+
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, LogOut, Loader2, X, Linkedin } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { Poppins } from "next/font/google";
+import axios from "axios";
+import toast from "react-hot-toast";
 
-interface BalloonProps {
-  id: number;
-  x: number;
-  color: string;
-  speed: number;
-  onClick: (id: number) => void;
-}
+const poppins = Poppins({
+  weight: ["400", "500", "600"],
+  subsets: ["latin"],
+  display: "swap",
+});
 
-const Balloon: React.FC<BalloonProps> = ({ id, x, color, speed, onClick }) => {
-  return (
-    <motion.div
-      className="absolute cursor-pointer hover:scale-110 transition-transform"
-      initial={{ bottom: -100, left: `${x}%` }}
-      animate={{ bottom: "110vh" }}
-      transition={{ duration: speed, ease: "linear" }}
-      onClick={() => onClick(id)}
-      style={{
-        width: "clamp(40px, 8vw, 60px)",
-        height: "clamp(50px, 10vw, 80px)",
-      }}
-      aria-label="Balloon"
-      role="button"
-    >
-      <svg viewBox="0 0 60 80" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M30 5 C13 5 5 20 5 35 C5 50 15 65 30 65 C45 65 55 50 55 35 C55 20 47 5 30 5 Z"
-          fill={color}
-          stroke="white"
-          strokeWidth="1"
-        />
-        <path d="M30 65 L35 80 L25 80 Z" fill={color} />
-      </svg>
-    </motion.div>
-  );
-};
-
-interface BalloonData {
-  id: number;
-  x: number;
-  color: string;
-  speed: number;
-}
-
-const getResultMessage = (score: number) => {
-  if (score >= 25)
-    return { message: "AMAZING!", emoji: "🎯", color: "text-emerald-500" };
-  if (score >= 15)
-    return { message: "GREAT JOB!", emoji: "👏", color: "text-blue-500" };
-  if (score >= 8)
-    return { message: "GOOD!", emoji: "👍", color: "text-amber-500" };
-  return { message: "KEEP PRACTICING!", emoji: "💪", color: "text-rose-500" };
-};
-
-export default function BalloonPopGame() {
+export default function Home() {
   const router = useRouter();
-  const [userName, setUserName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [score, setScore] = useState(0);
-  const [balloons, setBalloons] = useState<BalloonData[]>([]);
-  const [gameTime, setGameTime] = useState(10);
-  const [showResult, setShowResult] = useState(false);
-  const [totalEarnings, setTotalEarnings] = useState(0);
-  const [showWithdrawMessage, setShowWithdrawMessage] = useState(false);
-  const gameIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const maxBalloons = useRef(50);
+  const [activeChat, setActiveChat] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
 
-  const balloonColors = [
-    "#FF6B6B",
-    "#4ECDC4",
-    "#FFE66D",
-    "#1A535C",
-    "#FF9F1C",
-    "#6A0572",
-    "#AB83A1",
-    "#F15BB5",
-    "#9B5DE5",
-    "#00BBF9",
+  // Dummy users data
+  const users = [
+    {
+      id: "1",
+      name: "John Doe",
+      lastMessage: "Hey, how are you?",
+      time: "10:30 AM",
+      unread: 2,
+    },
+    {
+      id: "2",
+      name: "Jane Smith",
+      lastMessage: "Meeting at 3 PM",
+      time: "Yesterday",
+      unread: 0,
+    },
+    {
+      id: "3",
+      name: "Alex Johnson",
+      lastMessage: "Please review the docs",
+      time: "Monday",
+      unread: 5,
+    },
+    {
+      id: "4",
+      name: "Sarah Williams",
+      lastMessage: "Thanks for your help!",
+      time: "Last week",
+      unread: 0,
+    },
   ];
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
+  // Dummy messages data
+  const messages: Record<
+    string,
+    Array<{ text: string; sender: "me" | "them"; time: string }>
+  > = {
+    "1": [
+      { text: "Hey there!", sender: "them", time: "10:20 AM" },
+      { text: "Hi! How are you?", sender: "me", time: "10:22 AM" },
+      { text: "Hey, how are you?", sender: "them", time: "10:30 AM" },
+    ],
+    "2": [
+      { text: "About the project", sender: "them", time: "9:00 AM" },
+      { text: "Yes, what about it?", sender: "me", time: "9:05 AM" },
+      { text: "Meeting at 3 PM", sender: "them", time: "9:10 AM" },
+    ],
+    "3": [
+      { text: "Did you see the new docs?", sender: "them", time: "2:00 PM" },
+      { text: "Not yet, where are they?", sender: "me", time: "2:05 PM" },
+      { text: "Please review the docs", sender: "them", time: "2:10 PM" },
+    ],
+    "4": [
+      { text: "I had a question", sender: "them", time: "11:00 AM" },
+      { text: "Sure, what is it?", sender: "me", time: "11:05 AM" },
+      { text: "Thanks for your help!", sender: "them", time: "11:30 AM" },
+    ],
+  };
+
+  const handleLogout = async () => {
+    try {
+      await axios.get("/api/users/logout");
+      toast.success("Logout successful");
       router.push("/login");
-    } else {
-      const name = localStorage.getItem("userName");
-      setUserName(name || "Player");
-      setLoading(false);
+    } catch (error: any) {
+      console.error("Logout error:", error);
+      toast.error(error.response?.data?.error || "Logout failed");
     }
-
-    return () => {
-      if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    };
-  }, [router]);
-
-  const startGame = () => {
-    setGameStarted(true);
-    setScore(0);
-    setGameTime(10);
-    setBalloons([]);
-    setShowResult(false);
-    setShowWithdrawMessage(false);
-
-    gameIntervalRef.current = setInterval(() => {
-      if (balloons.length < maxBalloons.current) {
-        const newBalloon: BalloonData = {
-          id: Date.now(),
-          x: Math.random() * 90,
-          color:
-            balloonColors[Math.floor(Math.random() * balloonColors.length)],
-          speed: Math.random() * 5 + 3,
-        };
-        setBalloons((prev) => [
-          ...prev.slice(-maxBalloons.current),
-          newBalloon,
-        ]);
-      }
-    }, 700);
-
-    timerIntervalRef.current = setInterval(() => {
-      setGameTime((prevTime) => {
-        if (prevTime <= 1) {
-          endGame();
-          return 0;
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
   };
 
-  const endGame = () => {
-    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    setGameStarted(false);
-    setShowResult(true);
-
-    // Calculate earnings (100 USD per point)
-    const newEarnings = score * 100;
-    setTotalEarnings((prev) => prev + newEarnings);
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (message.trim() && activeChat) {
+      // In a real app, you would send this message to your backend
+      console.log(`Sending message to ${activeChat}: ${message}`);
+      setMessage("");
+    }
   };
-
-  const popBalloon = (id: number) => {
-    setBalloons((prev) => prev.filter((balloon) => balloon.id !== id));
-    setScore((prev) => prev + 1);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userName");
-    router.push("/login");
-  };
-
-  const handleWithdrawClick = () => {
-    setShowWithdrawMessage(true);
-  };
-
-  const formatUSD = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="flex flex-col items-center"
-        >
-          <Loader2 className="text-indigo-400 h-12 w-12" />
-          <p className="mt-4 text-indigo-800 font-medium">Loading game...</p>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 p-4 md:p-8 relative overflow-hidden">
-      {/* Game Header */}
-      <header className="max-w-4xl mx-auto mb-8 flex justify-between items-center">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-2"
-        >
-          <Sparkles className="text-indigo-500" />
-          <h1 className="text-xl font-bold text-indigo-800">
-            Balloon Pop Frenzy
-          </h1>
-        </motion.div>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 text-sm bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm hover:bg-white transition"
-        >
-          <LogOut size={16} />
-          <span>Sign Out</span>
-        </button>
+    <div className={`flex flex-col h-screen ${poppins.className}`}>
+      {/* Header Navbar */}
+      <header className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 shadow-md">
+        <div className="flex justify-between items-center max-w-7xl mx-auto">
+          <h1 className="text-xl font-bold">Chat App</h1>
+          <div className="flex items-center space-x-4">
+            <button className="flex items-center space-x-2 hover:bg-white/10 p-2 rounded-lg transition">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <span className="text-sm">ME</span>
+              </div>
+              <span>Profile</span>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 hover:bg-white/10 p-2 rounded-lg transition"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
       </header>
 
-      {/* Main Game Area */}
-      <main className="max-w-4xl mx-auto">
-        {/* Player Welcome */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar - Conversations */}
+        <motion.div
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="w-full md:w-80 bg-gray-50 border-r border-gray-200 overflow-y-auto"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-indigo-700 mb-2">
-            Hello, <span className="text-purple-600">{userName}!</span>
-          </h2>
-          <p className="text-indigo-600 max-w-lg mx-auto">
-            Test your reflexes in this fast-paced balloon popping challenge!
-          </p>
-        </motion.section>
-
-        {/* Earnings Display */}
-        {totalEarnings > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-amber-100 to-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-center shadow-sm"
-          >
-            <p className="text-sm text-amber-600 mb-1">Your Total Earnings</p>
-            <div className="flex items-center justify-center gap-3">
-              <p className="text-3xl font-bold text-amber-700">
-                {formatUSD(totalEarnings)}
-              </p>
-              <button
-                onClick={handleWithdrawClick}
-                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1 rounded-full text-sm font-medium transition"
-              >
-                Withdraw
-              </button>
+          <div className="p-4">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              Conversations
+            </h2>
+            <div className="space-y-2">
+              {users.map((user) => (
+                <motion.div
+                  key={user.id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setActiveChat(user.id)}
+                  className={`p-3 rounded-lg cursor-pointer transition ${
+                    activeChat === user.id
+                      ? "bg-indigo-100"
+                      : "hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900">{user.name}</h3>
+                      <p
+                        className={`text-sm truncate ${
+                          activeChat === user.id
+                            ? "text-indigo-800"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        {user.lastMessage}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs text-gray-500">{user.time}</span>
+                      {user.unread > 0 && (
+                        <span className="mt-1 bg-indigo-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {user.unread}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
-          </motion.div>
-        )}
-
-        {/* Game Controls */}
-        <section className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-indigo-100">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-6">
-            <div className="text-center">
-              <p className="text-sm text-indigo-500 mb-1">Current Score</p>
-              <p className="text-4xl font-bold text-indigo-700">{score}</p>
-            </div>
-
-            <div className="text-center">
-              <p className="text-sm text-indigo-500 mb-1">Time Remaining</p>
-              <p className="text-4xl font-bold text-indigo-700">{gameTime}s</p>
-            </div>
-
-            {!gameStarted && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white py-3 px-8 rounded-full font-bold text-lg shadow-lg"
-                onClick={startGame}
-              >
-                {score > 0 ? "Play Again" : "Start Game"}
-              </motion.button>
-            )}
           </div>
+        </motion.div>
 
-          {gameStarted && (
-            <p className="text-center text-indigo-600 font-medium">
-              Click the balloons as fast as you can!
-            </p>
-          )}
-        </section>
-
-        {/* Game Instructions */}
-        {!gameStarted && (
-          <motion.section
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-indigo-50 rounded-xl p-6 mb-8"
-          >
-            <h3 className="text-lg font-semibold text-indigo-700 mb-3">
-              How to Play
-            </h3>
-            <ul className="space-y-2 text-indigo-600">
-              <li className="flex items-start gap-2">
-                <span className="text-purple-500">•</span>
-                <span>Pop as many balloons as you can in 10 seconds</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-purple-500">•</span>
-                <span>Each balloon gives you 1 point (worth $100!)</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-purple-500">•</span>
-                <span>Try to beat your personal best!</span>
-              </li>
-            </ul>
-          </motion.section>
-        )}
-      </main>
-
-      {/* Balloon Game Area */}
-      {gameStarted && (
-        <div className="fixed inset-0 pointer-events-auto overflow-hidden">
-          {balloons.map((balloon) => (
-            <Balloon
-              key={balloon.id}
-              id={balloon.id}
-              x={balloon.x}
-              color={balloon.color}
-              speed={balloon.speed}
-              onClick={popBalloon}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Result Modal */}
-      <AnimatePresence>
-        {showResult && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full relative"
-            >
-              <button
-                onClick={() => setShowResult(false)}
-                className="absolute top-4 right-4 text-indigo-400 hover:text-indigo-600"
-              >
-                <X size={24} />
-              </button>
-
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-indigo-800 mb-2">
-                  Game Over!
-                </h3>
-                <p className="text-indigo-600 mb-6">Your final score:</p>
-
-                <div className="text-6xl font-bold mb-6">
-                  <span className={getResultMessage(score).color}>{score}</span>
-                </div>
-
-                <div className="text-3xl mb-6">
-                  <span className={getResultMessage(score).color}>
-                    {getResultMessage(score).message}{" "}
-                    {getResultMessage(score).emoji}
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col bg-white">
+          {activeChat ? (
+            <>
+              {/* Chat Header */}
+              <div className="border-b border-gray-200 p-4 flex items-center">
+                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mr-3">
+                  <span className="text-gray-600">
+                    {users.find((u) => u.id === activeChat)?.name.charAt(0)}
                   </span>
                 </div>
-
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-amber-600 mb-1">You earned:</p>
-                  <p className="text-2xl font-bold text-amber-700">
-                    {formatUSD(score * 100)}
-                  </p>
-                  <p className="text-xs text-amber-500 mt-1">
-                    (Total: {formatUSD(totalEarnings + score * 100)})
-                  </p>
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    {users.find((u) => u.id === activeChat)?.name}
+                  </h3>
+                  <p className="text-xs text-gray-500">Online</p>
                 </div>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white py-3 px-8 rounded-full font-bold text-lg shadow-lg"
-                  onClick={startGame}
-                >
-                  Play Again
-                </motion.button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Withdraw Message Modal */}
-      <AnimatePresence>
-        {showWithdrawMessage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full relative"
-            >
-              <button
-                onClick={() => setShowWithdrawMessage(false)}
-                className="absolute top-4 right-4 text-indigo-400 hover:text-indigo-600"
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages[activeChat]?.map((msg, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex ${
+                      msg.sender === "me" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-xs md:max-w-md rounded-lg p-3 ${
+                        msg.sender === "me"
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      <p>{msg.text}</p>
+                      <p
+                        className={`text-xs mt-1 ${
+                          msg.sender === "me"
+                            ? "text-indigo-200"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        {msg.time}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Message Input */}
+              <form
+                onSubmit={handleSendMessage}
+                className="border-t border-gray-200 p-4"
               >
-                <X size={24} />
-              </button>
-
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-indigo-800 mb-4">
-                  Surprise! 🎉
-                </h3>
-
-                <div className="space-y-4 mb-6">
-                  <p className="text-indigo-600">
-                    Just kidding! You won&#39;t get a single penny of that{" "}
-                    {formatUSD(totalEarnings)}. 😅
-                  </p>
-                  <p className="text-indigo-600">
-                    But hey, how about a virtual coffee instead?
-                  </p>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!message.trim()}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition"
+                  >
+                    Send
+                  </button>
                 </div>
-
-                <div className="bg-indigo-50 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-indigo-500 mb-2">
-                    Let&#39;s connect and chat about:
-                  </p>
-                  <ul className="text-xs text-indigo-600 space-y-1">
-                    <li>• This fun game you just played</li>
-                    <li>• Web development ideas</li>
-                    <li>• Or just life in general</li>
-                  </ul>
-                </div>
-
-                <a
-                  href="https://www.linkedin.com/in/akash08akter"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 bg-[#0A66C2] hover:bg-[#0A66C2]/90 text-white py-3 px-6 rounded-full font-medium transition"
+              </form>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-12 w-12 text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
-                  <Linkedin size={20} />
-                  Let&#39;s Connect on LinkedIn
-                </a>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">
+                No conversation selected
+              </h2>
+              <p className="text-gray-500 max-w-md">
+                Select a conversation from the sidebar to start chatting or
+                create a new conversation.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

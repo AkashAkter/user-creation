@@ -1,11 +1,9 @@
-/* eslint-disable react/no-unescaped-entities */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import Link from "next/link";
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import axios from "axios";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import React, { useEffect } from "react";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 import { Pacifico, Poppins } from "next/font/google";
@@ -23,35 +21,56 @@ const poppins = Poppins({
   display: "swap",
 });
 
-export default function Login() {
+export default function Register() {
   const router = useRouter();
-  const [user, setUser] = useState({
+  const [user, setUser] = React.useState({
+    username: "",
     email: "",
     password: "",
+    fullName: "",
+    bio: "",
   });
 
-  const [buttonDisabled, setButtonDisabled] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [buttonDisabled, setButtonDisabled] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
 
-  const signIn = async (e: React.FormEvent) => {
+  const onSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
-      const response = await axios.post("/api/users/login", user);
-      console.log("Login success", response.data);
-      toast.success("Login successful!");
-      router.push("/profile");
+      const response = await axios.post("/api/users/signup", {
+        username: user.username,
+        email: user.email,
+        password: user.password,
+        fullName: user.fullName,
+      });
+
+      if (response.data.success) {
+        toast.success("Account created successfully!");
+        router.push("/login");
+      } else {
+        toast.error(response.data.error || "Signup failed");
+      }
     } catch (error: any) {
-      console.error("Login failed", error.response?.data || error.message);
-      toast.error(error.response?.data?.error || "Login failed");
+      console.error("Signup error:", error.response?.data || error.message);
+      const errorMessage =
+        error.response?.data?.error ||
+        error.message ||
+        "Signup failed. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    setButtonDisabled(!user.email || !user.password);
+    setButtonDisabled(
+      !user.email ||
+        !user.password ||
+        !user.username ||
+        user.password.length < 6 ||
+        user.username.length < 3
+    );
   }, [user]);
 
   // Animation variants
@@ -150,7 +169,7 @@ export default function Login() {
               animate={{ scale: 1 }}
               transition={{ type: "spring", delay: 0.2 }}
             >
-              {loading ? "Welcome Back!" : "Welcome Back"}
+              {loading ? "Creating Your Space..." : "Join Our Community"}
             </motion.h1>
             <motion.p
               className="text-indigo-200 mt-2 text-sm"
@@ -158,7 +177,7 @@ export default function Login() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
             >
-              Sign in to continue your journey
+              Begin your creative journey with us
             </motion.p>
           </motion.div>
 
@@ -169,10 +188,61 @@ export default function Login() {
             initial="hidden"
             animate="visible"
           >
-            <form onSubmit={signIn} className="space-y-5">
+            <form onSubmit={onSignUp} className="space-y-5">
               <motion.div variants={itemVariants}>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Email
+                  Full Name
+                </label>
+                <motion.div
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                >
+                  <input
+                    type="text"
+                    placeholder="John Doe"
+                    value={user.fullName}
+                    onChange={(e) =>
+                      setUser({ ...user, fullName: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all text-white placeholder-slate-400 outline-none"
+                  />
+                </motion.div>
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Username*
+                </label>
+                <motion.div
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                >
+                  <input
+                    type="text"
+                    placeholder="john_doe"
+                    value={user.username}
+                    onChange={(e) =>
+                      setUser({ ...user, username: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all text-white placeholder-slate-400 outline-none"
+                    minLength={3}
+                    required
+                  />
+                </motion.div>
+                {user.username.length > 0 && user.username.length < 3 && (
+                  <motion.p
+                    className="text-xs text-rose-400 mt-1"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    Username must be at least 3 characters
+                  </motion.p>
+                )}
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Email*
                 </label>
                 <motion.div
                   whileHover={{ scale: 1.01 }}
@@ -180,7 +250,6 @@ export default function Login() {
                 >
                   <input
                     type="email"
-                    id="email"
                     placeholder="john@example.com"
                     value={user.email}
                     onChange={(e) =>
@@ -194,77 +263,33 @@ export default function Login() {
 
               <motion.div variants={itemVariants}>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Password
+                  Password*
                 </label>
                 <motion.div
-                  className="relative"
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                 >
                   <input
-                    type={showPassword ? "text" : "password"}
-                    id="password"
+                    type="password"
                     placeholder="••••••••"
                     value={user.password}
                     onChange={(e) =>
                       setUser({ ...user, password: e.target.value })
                     }
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all text-white placeholder-slate-400 outline-none pr-12"
+                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all text-white placeholder-slate-400 outline-none"
+                    minLength={6}
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-violet-300 transition-colors"
-                  >
-                    {showPassword ? (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
-                    )}
-                  </button>
                 </motion.div>
-              </motion.div>
-
-              <motion.div variants={itemVariants} className="flex justify-end">
-                <Link
-                  href="/forgot-password"
-                  className="text-sm text-violet-400 hover:text-violet-300 hover:underline transition-colors"
-                >
-                  Forgot password?
-                </Link>
+                {user.password.length > 0 && user.password.length < 6 && (
+                  <motion.p
+                    className="text-xs text-rose-400 mt-1"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    Password must be at least 6 characters
+                  </motion.p>
+                )}
               </motion.div>
 
               <motion.div variants={itemVariants} className="pt-2">
@@ -302,10 +327,10 @@ export default function Login() {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      Signing in...
+                      Creating your account...
                     </>
                   ) : (
-                    "Sign In"
+                    "Sign Up Now"
                   )}
                 </motion.button>
               </motion.div>
@@ -313,22 +338,19 @@ export default function Login() {
 
             <motion.div className="mt-6 text-center" variants={itemVariants}>
               <p className="text-sm text-slate-400">
-                Don't have an account?{" "}
+                Already have an account?{" "}
                 <Link
-                  href="/signup"
+                  href="/login"
                   className="text-violet-400 hover:text-violet-300 font-medium transition-colors hover:underline"
                 >
-                  Sign up
+                  Log in here
                 </Link>
               </p>
             </motion.div>
 
-            <motion.div
-              className="mt-6 pt-6 border-t border-slate-700/50 text-center"
-              variants={itemVariants}
-            >
+            <motion.div className="mt-4 text-center" variants={itemVariants}>
               <p className="text-xs text-slate-500">
-                By continuing, you agree to our{" "}
+                By signing up, you agree to our{" "}
                 <a href="#" className="text-violet-400 hover:underline">
                   Terms
                 </a>{" "}
